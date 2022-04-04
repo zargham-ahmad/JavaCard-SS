@@ -18,12 +18,12 @@ public class SecretStorageApplet extends Applet {
     private final static byte INS_VERIFY = 0x20;
 
     public final static byte PIN_TRY_LIMIT = 0x03;
-    public final static byte PIN_SIZE = 0x04;
+    public final static byte USER_PIN_SIZE = 0x04;
     private static byte[] default_pin = {0x31, 0x32, 0x33, 0x34};
-
+    
     private SecretStorageApplet() {
         m_user_pin = new OwnerPIN((byte) 3, (byte) 4);
-        m_user_pin.update(default_pin, (short) 0x00, PIN_SIZE);
+        m_user_pin.update(default_pin, (short) 0x00, USER_PIN_SIZE);
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -36,11 +36,11 @@ public class SecretStorageApplet extends Applet {
             return;
         }
 
-        byte[] buf = apdu.getBuffer();
+        byte[] buffer = apdu.getBuffer();
 
-        switch (buf[ISO7816.OFFSET_INS]) {
+        switch (buffer[ISO7816.OFFSET_INS]) {
             case INS_VERIFY:
-                verifyPin(apdu);
+                verifyPin(m_user_pin, USER_PIN_SIZE, apdu);
                 break;
             default:
                 // good practice: If you don't know the INStruction, say so:
@@ -50,18 +50,17 @@ public class SecretStorageApplet extends Applet {
 
     }
 
-    private void verifyPin(APDU apdu) {
-        byte[] buffer = apdu.getBuffer();
+    private void verifyPin(OwnerPIN pin, byte pinLength, APDU apdu) {
+        byte[] apdubuf = apdu.getBuffer();
         short msgLength;
-        //check(byte[] pin, short offset, byte length)
 
-        if (m_user_pin.check(buffer, (short) 0, buffer[(short) 4])) {
+        if (pin.check(apdubuf, (short) 0, pinLength)) {
             msgLength = (short) OK_PIN_MSG.length;
-            Util.arrayCopyNonAtomic(OK_PIN_MSG, (short) 0, buffer, (short) 0, msgLength);
+            Util.arrayCopyNonAtomic(OK_PIN_MSG, (short) 0, apdubuf, (short) 0, msgLength);
             apdu.setOutgoingAndSend((short) 0, msgLength);
         } else {
             msgLength = (short) BAD_PIN_MSG.length;
-            Util.arrayCopyNonAtomic(BAD_PIN_MSG, (short) 0, buffer, (short) 0, msgLength);
+            Util.arrayCopyNonAtomic(BAD_PIN_MSG, (short) 0, apdubuf, (short) 0, msgLength);
             apdu.setOutgoingAndSend((short) 0, msgLength);
         }
     }
