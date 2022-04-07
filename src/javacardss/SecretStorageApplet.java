@@ -2,9 +2,6 @@ package javacardss;
 
 import javacard.framework.*;
 
-/**
- * @author zargham ahmad
- */
 public class SecretStorageApplet extends Applet {
 
     private OwnerPIN m_duress_pin = null;
@@ -101,13 +98,10 @@ public class SecretStorageApplet extends Applet {
         APDU apdu = APDU.getCurrentAPDU();
         byte[] buffer = APDU.getCurrentAPDUBuffer();
 
-        // Checks the value of P1&P2
         if (Util.getShort(buffer, ISO7816.OFFSET_P1) != 0)
             ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
-        // Checks the minimum length
 //        if ((short) (buffer[ISO7816.OFFSET_LC] & 0xFF) < 3)
 //            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
-        // Receives data and checks its length
         if (apdu.setIncomingAndReceive() !=
                 (short) (buffer[ISO7816.OFFSET_LC] & 0xFF))
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
@@ -118,16 +112,15 @@ public class SecretStorageApplet extends Applet {
 //        if (buffer[ISO7816.OFFSET_LC] < (short) (ofsSecretValue - 2))
 //            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
 
-        // Checks the password
 //        if (checkTLV(buffer, ofsSecretValue, TAG_SECRETVALUE, keyValueManager.SIZE_SECRETVALUE) !=
 //                (short) (ISO7816.OFFSET_CDATA + (short) (buffer[ISO7816.OFFSET_LC] & 0xFF)))
 //            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
 
-        // Search the identifier in the current base
+        // Search the key in the current base
         if (keyValueManager.search(buffer, (short) (ofsKey + 2), buffer[(short) (ofsKey + 1)]) != null)
             ISOException.throwIt(SW_DUPLICATE_KEY);
 
-        // Allocates and initializes a password entry
+        // Allocates and initializes a key valye pair entry
         JCSystem.beginTransaction();
         keyValueManager keyManager = keyValueManager.getInstance();
         keyManager.setKey(buffer, (short) (ofsKey + 2), buffer[(short) (ofsKey + 1)]);
