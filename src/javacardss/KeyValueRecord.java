@@ -6,13 +6,13 @@ import javacard.framework.*;
  *
  * @author zargham ahmad
  */
-public class keyValueManager {
-    public static short SIZE_KEY = 16;
-    public static short SIZE_SECRETVALUE = 16;
-
-    private keyValueManager next;
-    private static keyValueManager first;
-    private static keyValueManager deleted;
+public class KeyValueRecord {
+    public static short SIZE_KEY = 32;
+    public static short SIZE_VALUE = 64;
+    
+    private KeyValueRecord next;
+    private static KeyValueRecord first;
+    private static KeyValueRecord deleted;
 
     private byte[] key;
     private byte[] secretValue;
@@ -20,22 +20,20 @@ public class keyValueManager {
     private byte keyLength;
     private byte secretValueLength;
 
-    private keyValueManager() {
-        // Allocates all fields
+    private KeyValueRecord() {
         key = new byte[SIZE_KEY];
-        secretValue = new byte[SIZE_SECRETVALUE];
-        // The new element is inserted in front of the list
+        secretValue = new byte[SIZE_VALUE];
         next = first;
         first = this;
     }
 
-    static keyValueManager getInstance() {
+    static KeyValueRecord getInstance() {
         if (deleted == null) {
             // There is no element to recycle
-            return new keyValueManager();
+            return new KeyValueRecord();
         } else {
             // Recycle the first available element
-            keyValueManager instance = deleted;
+            KeyValueRecord instance = deleted;
             deleted = instance.next;
             instance.next = first;
             first = instance;
@@ -43,16 +41,16 @@ public class keyValueManager {
         }
     }
 
-    static keyValueManager search(byte[] buf, short ofs, byte len) {
-        for (keyValueManager keyManager = first; keyManager != null; keyManager = keyManager.next) {
-            if (keyManager.keyLength != len) continue;
-            if (Util.arrayCompare(keyManager.key, (short) 0, buf, ofs, len) == 0)
-                return keyManager;
+    static KeyValueRecord search(byte[] buf, short ofs, byte len) {
+        for (KeyValueRecord record = first; record != null; record = record.next) {
+            if (record.keyLength != len) continue;
+            if (Util.arrayCompare(record.key, (short) 0, buf, ofs, len) == 0)
+                return record;
         }
         return null;
     }
 
-    public static keyValueManager getFirst() {
+    public static KeyValueRecord getFirst() {
         return first;
     }
 
@@ -60,9 +58,9 @@ public class keyValueManager {
         if (first == this) {
             first = next;
         } else {
-            for (keyValueManager keyManager = first; keyManager != null; keyManager = keyManager.next)
-                if (keyManager.next == this)
-                    keyManager.next = next;
+            for (KeyValueRecord record = first; record != null; record = record.next)
+                if (record.next == this)
+                    record.next = next;
         }
     }
 
@@ -74,7 +72,7 @@ public class keyValueManager {
     }
 
     static void delete(byte[] buf, short ofs, byte len) {
-        keyValueManager keyManager = search(buf, ofs, len);
+        KeyValueRecord keyManager = search(buf, ofs, len);
         if (keyManager != null) {
             JCSystem.beginTransaction();
             keyManager.remove();
@@ -101,7 +99,7 @@ public class keyValueManager {
         return secretValueLength;
     }
 
-    public keyValueManager getNext() {
+    public KeyValueRecord getNext() {
         return next;
     }
 
