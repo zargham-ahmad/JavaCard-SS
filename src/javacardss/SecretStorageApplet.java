@@ -33,6 +33,8 @@ public class SecretStorageApplet extends Applet {
     private final static byte INS_VERIFY = 0x20;
     public final static byte INS_ADD_KEYVALUE_ENTRY = 0x30;
     public final static byte INS_GET_VALUE = 0x40;
+    public final static byte INS_GET_KEYS = 0x50;
+    public final static byte INS_GET_KEY_LENS = 0x60;
 
     public final static byte PIN_TRY_LIMIT = 0x03;
     public final static byte PIN_SIZE = 0x04;
@@ -77,7 +79,12 @@ public class SecretStorageApplet extends Applet {
                     case INS_GET_VALUE:
                         getValue(apdu);
                         break;
-
+                    case INS_GET_KEYS:
+                        retrieveKeys(apdu);
+                        break;
+                    case INS_GET_KEY_LENS:
+                        retrieveKeyLens(apdu);
+                        break;
                     default:
                         ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
                         break;
@@ -117,10 +124,6 @@ public class SecretStorageApplet extends Applet {
         
         if (!m_user_pin.check(buffer, ISO7816.OFFSET_CDATA, PIN_SIZE))
             ISOException.throwIt(SW_WRONG_PIN);
-            
-        // this isn't necessary
-        Util.arrayCopyNonAtomic(OK_PIN_MSG, (short) 0, buffer, ISO7816.OFFSET_CDATA, (short)OK_PIN_MSG.length);
-        apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, (short)OK_PIN_MSG.length);
     }
     
     void checkTLV(byte[] buffer, short inOfs,
@@ -172,5 +175,28 @@ public class SecretStorageApplet extends Applet {
         record.setKey(buffer, (short) (ofsKey + 1), key_size);
         record.setSecretValue(buffer, (short) (ofsSecretValue + 1), value_size);
         JCSystem.commitTransaction();
+    }
+
+    private void retrieveKeys(APDU apdu) {
+        try{
+            byte[] buffer = apdu.getBuffer();
+
+            KeyValueRecord record = KeyValueRecord.getInstance();
+            
+            short keys_len = record.getAllKeys(buffer, ISO7816.OFFSET_CDATA);
+            apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, keys_len);
+        
+        } catch(Exception e){
+            throw (e);
+        }
+    }
+
+    private void retrieveKeyLens(APDU apdu) {
+        byte[] buffer = apdu.getBuffer();
+
+        KeyValueRecord record = KeyValueRecord.getInstance();
+
+        short len = record.getAllKeyLens(buffer, ISO7816.OFFSET_CDATA);
+        apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, len);
     }
 }
