@@ -1,9 +1,5 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Main.java to edit this template
- */
+package apdu;
 
-package jcsim;
 import javacardss.SecretStorageApplet;
 import cardTools.CardManager;
 import cardTools.RunConfig;
@@ -16,12 +12,14 @@ import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
 
 /**
+ * Test class.
+ * Note: If simulator cannot be started try adding "-noverify" JVM parameter
  *
- * @author zargham ahmad
+ * @author Petr Svenda (petrs), Dusan Klinec (ph4r05)
  */
-public class Jcsim {
-private static String APPLET_AID = "A000000408000010000100";
-    //private static String APPLET_AID2 = "0102030405060708090102";
+public class SecretStorageAPDU {
+    private static String APPLET_AID = "73696d706c656170706c6574";
+    private static String APPLET_AID2 = "0102030405060708090102";
     private static byte APPLET_AID_BYTE[] = Util.hexStringToByteArray(APPLET_AID);
 
     private static final String STR_APDU_INCORRECT_PIN = "B02000000431323333";
@@ -29,7 +27,7 @@ private static String APPLET_AID = "A000000408000010000100";
     private static final String STR_APDU_PIN_HEADER = "B0200000";
     private static final String STR_APDU_INSERT_KEY_VALUE_HEADER = "B030";
     private static final String STR_APDU_GET_VALUE_HEADER = "B040";
-    private static final String STR_APDU_GET_LIST = "B0500000";
+	private static final String STR_APDU_GET_LIST = "B0500000";
     
     private static final String STR_APDU_UNSUPPORTED_INS = "B0E1000000"; // This instruction is not supported by the card
 
@@ -40,7 +38,7 @@ private static String APPLET_AID = "A000000408000010000100";
      */
     public static void main(String[] args) {
         try {
-            Jcsim main = new Jcsim();
+            SecretStorageAPDU main = new SecretStorageAPDU();
             
             main.demo();
             
@@ -90,8 +88,7 @@ private static String APPLET_AID = "A000000408000010000100";
                     retrieveValue(cardMngr);
                     break;
                 case 4: 
-                    listKeys(cardMngr);
-                    break;
+                   listKeys(cardMngr);
                 default:
                     System.out.println("Unsupported operation!");
                     break;
@@ -160,8 +157,8 @@ private static String APPLET_AID = "A000000408000010000100";
         String value = new String(response.getData(), "UTF-8");
         System.out.println("Value:" + value + "\n");
     }
-    
-    private void listKeys(CardManager cardMngr) throws CardException, UnsupportedEncodingException {
+	
+	private void listKeys(CardManager cardMngr) throws CardException, UnsupportedEncodingException {
         Scanner sc = new Scanner(System.in);
         
         final ResponseAPDU response = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(STR_APDU_GET_LIST)));
@@ -180,7 +177,6 @@ private static String APPLET_AID = "A000000408000010000100";
             System.out.println(keys + "\n");       
          }    
     }
-    
 
     private void checkPIN(CardManager cardMngr) throws CardException {  
         Scanner sc = new Scanner(System.in);      
@@ -232,5 +228,4 @@ private static String APPLET_AID = "A000000408000010000100";
         
         return "";
     }
-
 }
