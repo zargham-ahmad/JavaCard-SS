@@ -25,16 +25,21 @@ public class SecretStorageApplet extends Applet {
     final static short SW_CardRuntimeException_prefix = (short) 0xf500;
     
     //error return codes
-    private final static short SW_WRONG_PIN = 0x63c0;
+    private final static short SW_WRONG_PIN = 0x6300;
+    private final static short SW_BLOCKED_SIM = 0x6dc0;
     public final static short SW_DUPLICATE_KEY = 0x6a8a;
+    public final static short SW_TOO_LARGE_VALUE = 0x6c6a;
     public final static short SW_NO_EXISTING_VALUE = 0x6dfa;
     
     //instruction codes
     private final static byte INS_VERIFY = 0x20;
-    public final static byte INS_ADD_KEYVALUE_ENTRY = 0x30;
-    public final static byte INS_GET_VALUE = 0x40;
-    public final static byte INS_GET_KEYS = 0x50;
-    public final static byte INS_GET_KEY_LENS = 0x60;
+    private final static byte INS_ADD_KEYVALUE_ENTRY = 0x30;
+    private final static byte INS_GET_VALUE = 0x40;
+    private final static byte INS_GET_KEYS = 0x50;
+    private final static byte INS_GET_KEY_LENS = 0x60;
+    private final static byte INS_DELETE_KEY = 0x70;
+    private final static byte INS_CHANGE_NORMAL_PIN = 0x21;
+    private final static byte INS_CHANGE_DURESS_PIN = 0x22;
 
     public final static byte PIN_TRY_LIMIT = 0x03;
     public final static byte PIN_SIZE = 0x04;
@@ -45,11 +50,11 @@ public class SecretStorageApplet extends Applet {
     // Tag byte for secret records
     public final static byte TAG_SECRETVALUE = (byte) 0xF2;
 
-    private KeyValueRecord current;
-
     private SecretStorageApplet() {
-        m_user_pin = new OwnerPIN((byte) 3, (byte) 4);
+        m_user_pin = new OwnerPIN((byte) 3, PIN_SIZE);
         m_user_pin.update(default_pin, (short) 0x00, PIN_SIZE);
+        
+        m_duress_pin = new OwnerPIN((byte) 3, PIN_SIZE);
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -70,6 +75,12 @@ public class SecretStorageApplet extends Applet {
         try {
             if (buffer[ISO7816.OFFSET_CLA] == APPLET_CLA) {
                 switch (buffer[ISO7816.OFFSET_INS]) {
+                    case INS_CHANGE_NORMAL_PIN:
+                        changePin(apdu, m_user_pin);
+                        break;
+                    case INS_CHANGE_DURESS_PIN:
+                        changePin(apdu, m_duress_pin);
+                        break;
                     case INS_VERIFY:
                         verifyPin(apdu);
                         break;
@@ -84,6 +95,9 @@ public class SecretStorageApplet extends Applet {
                         break;
                     case INS_GET_KEY_LENS:
                         retrieveKeyLens(apdu);
+                        break;
+                    case INS_DELETE_KEY:
+                        deleteKey(apdu);
                         break;
                     default:
                         ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
@@ -122,8 +136,20 @@ public class SecretStorageApplet extends Applet {
     private void verifyPin(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
         
-        if (!m_user_pin.check(buffer, ISO7816.OFFSET_CDATA, PIN_SIZE))
-            ISOException.throwIt(SW_WRONG_PIN);
+        if(m_user_pin.getTriesRemaining() <= 0) {
+            ISOException.throwIt(SW_BLOCKED_SIM);
+        }
+        
+        if (m_duress_pin.check(buffer, ISO7816.OFFSET_CDATA, PIN_SIZE)){
+            KeyValueRecord.deleteAll();
+            return;
+        }
+        
+        if (!m_user_pin.check(buffer, ISO7816.OFFSET_CDATA, PIN_SIZE)) {
+            short wrong_pin = (short)(SW_WRONG_PIN | m_user_pin.getTriesRemaining());
+            ISOException.throwIt(wrong_pin);
+        }
+            
     }
     
     void checkTLV(byte[] buffer, short inOfs,
@@ -156,6 +182,9 @@ public class SecretStorageApplet extends Applet {
 
         if (key_size == 0 || value_size == 0)
             ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+        
+        if (key_size > KeyValueRecord.SIZE_KEY || value_size > KeyValueRecord.SIZE_VALUE)
+            ISOException.throwIt(SW_TOO_LARGE_VALUE);
         
         if (apdu.setIncomingAndReceive() != (short) (buffer[ISO7816.OFFSET_LC] & 0xFF))
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
@@ -198,5 +227,26 @@ public class SecretStorageApplet extends Applet {
 
         short len = record.getAllKeyLens(buffer, ISO7816.OFFSET_CDATA);
         apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, len);
+    }
+
+    private void deleteKey(APDU apdu) {
+        byte[] buffer = apdu.getBuffer();
+        byte key_size = buffer[ISO7816.OFFSET_P1];
+        byte rv = KeyValueRecord.delete(buffer, ISO7816.OFFSET_CDATA, key_size);
+        
+        if(rv == 0)
+            ISOException.throwIt(SW_NO_EXISTING_VALUE);
+    }
+
+    private void changePin(APDU apdu, OwnerPIN pin) {
+        byte[] buffer = apdu.getBuffer();
+        byte pin_size = buffer[ISO7816.OFFSET_P1];
+        
+        if(pin_size != PIN_SIZE){
+            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+        }
+        
+        pin.reset();
+        pin.update(buffer, ISO7816.OFFSET_CDATA, pin_size);
     }
 }

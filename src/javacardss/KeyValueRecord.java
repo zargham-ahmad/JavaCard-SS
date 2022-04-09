@@ -1,6 +1,7 @@
 package javacardss;
 
 import javacard.framework.*;
+import javacard.security.RandomData;
 
 /**
  *
@@ -19,7 +20,7 @@ public class KeyValueRecord {
 
     private byte keyLength;
     private byte secretValueLength;
-
+    
     private KeyValueRecord() {
         key = new byte[SIZE_KEY];
         secretValue = new byte[SIZE_VALUE];
@@ -65,20 +66,38 @@ public class KeyValueRecord {
     }
 
     private void recycle() {
+        RandomData m_secureRandom =  RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);;
+        
+        m_secureRandom.setSeed(new byte[]{(byte)0x13,(byte)0x51,(byte)0x50,(byte)0x55,(byte)0x80,(byte)0x65,(byte)0x42,(byte)0x51,(byte)0x12,(byte)0x95},(short) 0,(short) 10);
+        m_secureRandom.generateData(this.key, (short) 0, (short) keyLength);
+        m_secureRandom.generateData(this.secretValue, (short) 0, (short) secretValueLength);
         next = deleted;
         keyLength = 0;
         secretValueLength = 0;
         deleted = this;
     }
+    
+    static void deleteAll() {
+        for (KeyValueRecord record = first; record != null; record = record.next) {
+            JCSystem.beginTransaction();
+            record.remove();
+            record.recycle();
+            JCSystem.commitTransaction();
+        }
+    }
 
-    static void delete(byte[] buf, short ofs, byte len) {
+    static byte delete(byte[] buf, short ofs, byte len) {
         KeyValueRecord keyManager = search(buf, ofs, len);
         if (keyManager != null) {
             JCSystem.beginTransaction();
             keyManager.remove();
             keyManager.recycle();
             JCSystem.commitTransaction();
+            
+            return 1; // delete successful
         }
+        
+        return 0;
     }
     
     static short getAllKeys(byte[] buf, byte ofs) {

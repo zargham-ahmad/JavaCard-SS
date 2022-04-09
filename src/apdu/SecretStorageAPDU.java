@@ -26,8 +26,12 @@ public class SecretStorageAPDU {
     private static final String STR_APDU_INCORRECT_PIN = "B02000000431323333";
     
     private static final String STR_APDU_PIN_HEADER = "B0200000";
+    private static final String STR_APDU_CHANGE_NORMAL_PIN_HEADER = "B021";
+    private static final String STR_APDU_CHANGE_DURESS_PIN_HEADER = "B022";
+    
     private static final String STR_APDU_INSERT_KEY_VALUE_HEADER = "B030";
     private static final String STR_APDU_GET_VALUE_HEADER = "B040";
+    private static final String STR_APDU_DELETE_KEY_HEADER = "B070";
     private static final String STR_APDU_GET_KEYS = "B0500000";
     private static final String STR_APDU_GET_KEY_LENS = "B0600000";
     
@@ -78,11 +82,12 @@ public class SecretStorageAPDU {
         
         while(in_action != 0) {
             System.out.println("-----------------------");
-            System.out.println("What do you want to do?\n1)Change PIN\n2)Add secret\n3)Get secret\n4)List keys\n0)Finish");
+            System.out.println("What do you want to do?\n1)Change PIN\n2)Add secret\n3)Get secret\n4)Delete secret\n5)List keys\n0)Finish");
             in_action = sc.nextInt();
             
             switch(in_action) {
                 case 1: 
+                    changePin(cardMngr);
                     break;
                 case 2: 
                     addSecret(cardMngr);
@@ -91,6 +96,9 @@ public class SecretStorageAPDU {
                     retrieveValue(cardMngr);
                     break;
                 case 4: 
+                    deleteSecret(cardMngr);
+                    break;
+                case 5: 
                     listKeys(cardMngr);
                     break;
                 default:
@@ -165,16 +173,24 @@ public class SecretStorageAPDU {
     private void checkPIN(CardManager cardMngr) throws CardException {  
         Scanner sc = new Scanner(System.in);      
         
-        System.out.print("Enter PIN please (in hex): ");
-        String pin = sc.nextLine();
-        String pin_apdu = buildPinAPDU(pin);
-        System.out.println(pin_apdu);
-        final ResponseAPDU response = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(pin_apdu)));
+        int pin_format = getFormat("pin");
+        ResponseAPDU response;
+        do {
+            System.out.print("Enter PIN please: ");
+            String pin = sc.nextLine();
+            pin = convertFormatToHex(pin, pin_format);
+            String pin_apdu = buildPinAPDU(pin);
+            response = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(pin_apdu)));
+            
+            if((response.getSW() & 0xff00) == (0x63 << 8)) {
+                int retries_remaining = response.getSW() & 0xff;
+                System.err.println("Wrong PIN! (retries remaining: " + retries_remaining + ")\n");
+            } else if(response.getSW() == 0x6dc0) {
+                System.err.println("No more retries left! The card is blocked.\n");
+                System.exit(1);
+            }
+        } while(response.getSW() != 0x9000);
         
-        if(response.getSW() != 0x9000) {
-            System.err.println("Wrong PIN!\n");
-            System.exit(1);
-        }
     }    
 
     private String buildPinAPDU(String pin) {
@@ -189,11 +205,23 @@ public class SecretStorageAPDU {
         int format;        
         
         do {
-            System.out.println("Which format is your " + s + " in?\n1)hex\n2)string\n3)bin");
+            System.out.println("Which format is your " + s + " in?\n1)hex\n2)string");
             format = sc.nextInt();
-        } while(format > 3 || format <= 0);
+        } while(format > 2 || format <= 0);
         
         return format;
+    }
+    
+    private int getPinType() {
+        Scanner sc = new Scanner(System.in);
+        int pin;
+        
+        do {
+            System.out.println("Which PIN do you want to change?\n1)Normal\n2)Duress");
+            pin = sc.nextInt();
+        } while(pin > 2 || pin < 1);
+        
+        return pin;
     }
 
     private String convertFormatToHex(String value, int format) {
@@ -202,9 +230,6 @@ public class SecretStorageAPDU {
                 return value;
             case 2: // string
                 return Util.toHex(value.getBytes());
-            case 3: // bin
-                System.err.println("Unsupported for now!");
-                System.exit(1);
             default:
                 System.err.println("Unsupported format!");
                 System.exit(1);
@@ -220,11 +245,15 @@ public class SecretStorageAPDU {
         
         String[] keys = parseKeys(response_keys.getData(), response_lens.getData());
         
-        System.out.println("Possible keys: ");
-        for(String key : keys) {
-            System.out.print(key +", ");
+        if(keys.length == 0) {
+            System.out.println("No keys available.");
+        } else {
+            System.out.println("Possible keys: ");
+            for(String key : keys) {
+                System.out.print(key +", ");
+            }
+            System.out.print("\n");
         }
-        System.out.print("\n");
     }
 
     private String[] parseKeys(byte[] keys, byte[] key_lens) {        
@@ -257,5 +286,55 @@ public class SecretStorageAPDU {
         }
         
         return out;
+    }
+    
+    private void deleteSecret(CardManager cardMngr) throws CardException {
+        Scanner sc = new Scanner(System.in);
+        
+        int format_key = getFormat("key");
+        System.out.print("Key of the secret: ");
+        String key_print = sc.nextLine();
+        
+        String key = convertFormatToHex(key_print, format_key);
+        int key_len = key.length();
+        
+        String apdu = String.format("%s%02x00%02x%s", 
+                STR_APDU_DELETE_KEY_HEADER,
+                key_len/2,
+                key_len/2,
+                key);
+        
+        final ResponseAPDU response = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(apdu)));
+        
+        if(response.getSW() == 0x6dfa) {
+            System.out.println("No such key exists!");
+        } else {
+            System.out.println("\'" + key_print + "\'" + " record deleted.");
+        }
+    }
+
+    private void changePin(CardManager cardMngr) throws CardException {
+        Scanner sc = new Scanner(System.in);
+        
+        int pin_type = getPinType();
+        int format_pin = getFormat("pin");
+        System.out.print("PIN: ");
+        String pin = sc.nextLine();
+        
+        pin = convertFormatToHex(pin, format_pin);
+        int pin_len = pin.length();
+        
+        String apdu = String.format("%s%02x00%02x%s", 
+                pin_type == 1 ? STR_APDU_CHANGE_NORMAL_PIN_HEADER : STR_APDU_CHANGE_DURESS_PIN_HEADER,
+                pin_len/2,
+                pin_len/2,
+                pin_len);
+        
+        final ResponseAPDU response = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(apdu)));
+        
+        if(response.getSW() != 0x9000){
+            System.out.println("Something went wrong!");
+            System.exit(1);
+        }
     }
 }
