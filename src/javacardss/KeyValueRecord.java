@@ -80,6 +80,29 @@ public class KeyValueRecord {
             JCSystem.commitTransaction();
         }
     }
+    
+    static short getAllKeys(byte[] buf, byte ofs) {
+        short len = 0;
+        
+        for (KeyValueRecord record = first; record != null; record = record.next) {                
+            Util.arrayCopy(record.key, (short) 0, buf, ofs, record.keyLength);
+            ofs += record.keyLength ;
+            len += record.keyLength;
+        }
+        
+        return len;
+    }
+    
+    static short getAllKeyLens(byte[] buf, byte ofs) {
+        short len = 0;
+        
+        for (KeyValueRecord record = first; record != null; record = record.next) {
+            buf[ofs++] = record.keyLength;
+            len++;
+        }
+
+        return len;
+    }
 
     byte getKey(byte[] buf, short ofs) {
         Util.arrayCopy(key, (short) 0, buf, ofs, keyLength);
@@ -103,7 +126,7 @@ public class KeyValueRecord {
         return next;
     }
 
-    public void setKey(byte[] buf, short ofs, byte len) {
+    public void setKey(byte[] buf, short ofs, byte len) {        
         Util.arrayCopy(buf, ofs, key, (short) 0, len);
         keyLength = len;
     }

@@ -5,6 +5,7 @@ import cardTools.CardManager;
 import cardTools.RunConfig;
 import cardTools.Util;
 import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.Scanner;
 import javax.smartcardio.CardException;
 
@@ -27,6 +28,8 @@ public class SecretStorageAPDU {
     private static final String STR_APDU_PIN_HEADER = "B0200000";
     private static final String STR_APDU_INSERT_KEY_VALUE_HEADER = "B030";
     private static final String STR_APDU_GET_VALUE_HEADER = "B040";
+    private static final String STR_APDU_GET_KEYS = "B0500000";
+    private static final String STR_APDU_GET_KEY_LENS = "B0600000";
     
     private static final String STR_APDU_UNSUPPORTED_INS = "B0E1000000"; // This instruction is not supported by the card
 
@@ -74,6 +77,7 @@ public class SecretStorageAPDU {
         checkPIN(cardMngr);
         
         while(in_action != 0) {
+            System.out.println("-----------------------");
             System.out.println("What do you want to do?\n1)Change PIN\n2)Add secret\n3)Get secret\n4)List keys\n0)Finish");
             in_action = sc.nextInt();
             
@@ -87,6 +91,7 @@ public class SecretStorageAPDU {
                     retrieveValue(cardMngr);
                     break;
                 case 4: 
+                    listKeys(cardMngr);
                     break;
                 default:
                     System.out.println("Unsupported operation!");
@@ -186,7 +191,7 @@ public class SecretStorageAPDU {
         do {
             System.out.println("Which format is your " + s + " in?\n1)hex\n2)string\n3)bin");
             format = sc.nextInt();
-        } while(format > 3 || format < 0);
+        } while(format > 3 || format <= 0);
         
         return format;
     }
@@ -206,5 +211,51 @@ public class SecretStorageAPDU {
         }
         
         return "";
+    }
+
+    private void listKeys(CardManager cardMngr) throws CardException {
+        final ResponseAPDU response_keys = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(STR_APDU_GET_KEYS)));
+        
+        final ResponseAPDU response_lens = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(STR_APDU_GET_KEY_LENS)));
+        
+        String[] keys = parseKeys(response_keys.getData(), response_lens.getData());
+        
+        System.out.println("Possible keys: ");
+        for(String key : keys) {
+            System.out.print(key +", ");
+        }
+        System.out.print("\n");
+    }
+
+    private String[] parseKeys(byte[] keys, byte[] key_lens) {        
+        byte[] trimmed_key_lens = removeZeros(key_lens);
+        
+        String[] parsed_keys = new String[trimmed_key_lens.length];
+        int ofs = 0;
+        for(int i = 0; i < trimmed_key_lens.length; i++) {
+            byte key_len = trimmed_key_lens[i];
+            
+            String key = new String(Arrays.copyOfRange(keys, ofs, ofs + key_len));
+            parsed_keys[i] = key;
+            
+            ofs += key_len;
+        }
+        
+        return parsed_keys;
+    }
+    
+    private byte[] removeZeros(byte[] key_lens) {
+        int count = 0;
+        for(byte k : key_lens) {
+            if(k != 0) count++;
+        }
+        
+        byte[] out = new byte[count];
+        int i = 0;
+        for(byte k : key_lens) {
+            if(k != 0) out[i++] = k;
+        }
+        
+        return out;
     }
 }
