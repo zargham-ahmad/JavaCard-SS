@@ -6,8 +6,7 @@ import javacard.security.CryptoException;
 public class SecretStorageApplet extends Applet {
 
     private OwnerPIN m_duress_pin = null;
-    private OwnerPIN m_user_pin = null;
-    private static final byte[] OK_PIN_MSG = {'P', 'i', 'n', ' ', 'O', 'K', '!'};
+    private OwnerPIN m_user_pin = null; 
 
     final static byte APPLET_CLA = (byte) 0xB0;
     
@@ -43,6 +42,7 @@ public class SecretStorageApplet extends Applet {
 
     public final static byte PIN_TRY_LIMIT = 0x03;
     public final static byte PIN_SIZE = 0x04;
+    private static byte[] default_duress_pin = {0x71, 0x62, 0x13, 0x59};
     private static byte[] default_pin = {0x31, 0x32, 0x33, 0x34};
 
     // Tag byte for key
@@ -51,10 +51,11 @@ public class SecretStorageApplet extends Applet {
     public final static byte TAG_SECRETVALUE = (byte) 0xF2;
 
     private SecretStorageApplet() {
-        m_user_pin = new OwnerPIN((byte) 3, PIN_SIZE);
-        m_user_pin.update(default_pin, (short) 0x00, PIN_SIZE);
+        m_user_pin = new OwnerPIN(PIN_TRY_LIMIT, PIN_SIZE);
+        m_user_pin.update(default_pin, (short) 0, PIN_SIZE);
         
-        m_duress_pin = new OwnerPIN((byte) 3, PIN_SIZE);
+        m_duress_pin = new OwnerPIN(PIN_TRY_LIMIT, PIN_SIZE);
+        m_user_pin.update(default_duress_pin, (short) 0, PIN_SIZE);
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
@@ -136,7 +137,7 @@ public class SecretStorageApplet extends Applet {
     private void verifyPin(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
         
-        if(m_user_pin.getTriesRemaining() <= 0) {
+        if(m_user_pin.getTriesRemaining() <= 0 || m_duress_pin.getTriesRemaining() <= 0) {
             ISOException.throwIt(SW_BLOCKED_SIM);
         }
         

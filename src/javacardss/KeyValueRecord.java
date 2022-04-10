@@ -8,7 +8,7 @@ import javacard.security.RandomData;
  * @author zargham ahmad
  */
 public class KeyValueRecord {
-    public static short SIZE_KEY = 32;
+    public static short SIZE_KEY = 48;
     public static short SIZE_VALUE = 64;
     
     private KeyValueRecord next;
@@ -66,7 +66,7 @@ public class KeyValueRecord {
     }
 
     private void recycle() {
-        RandomData m_secureRandom =  RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);;
+        RandomData m_secureRandom =  RandomData.getInstance(RandomData.ALG_FAST);
         
         m_secureRandom.setSeed(new byte[]{(byte)0x13,(byte)0x51,(byte)0x50,(byte)0x55,(byte)0x80,(byte)0x65,(byte)0x42,(byte)0x51,(byte)0x12,(byte)0x95},(short) 0,(short) 10);
         m_secureRandom.generateData(this.key, (short) 0, (short) keyLength);
