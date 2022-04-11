@@ -42,7 +42,7 @@ public class SecretStorageApplet extends Applet {
 
     public final static byte PIN_TRY_LIMIT = 0x03;
     public final static byte PIN_SIZE = 0x04;
-    private static byte[] default_duress_pin = {0x71, 0x62, 0x13, 0x59};
+    private static byte[] default_duress_pin = {0x35, 0x33, 0x32, 0x36};
     private static byte[] default_pin = {0x31, 0x32, 0x33, 0x34};
 
     // Tag byte for key
@@ -55,7 +55,7 @@ public class SecretStorageApplet extends Applet {
         m_user_pin.update(default_pin, (short) 0, PIN_SIZE);
         
         m_duress_pin = new OwnerPIN(PIN_TRY_LIMIT, PIN_SIZE);
-        m_user_pin.update(default_duress_pin, (short) 0, PIN_SIZE);
+        m_duress_pin.update(default_duress_pin, (short) 0, PIN_SIZE);
     }
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
