@@ -133,6 +133,11 @@ public class SecretStorageApplet extends Applet {
             ISOException.throwIt(SW_Exception);
         }
     }
+	
+	// Resets the PIN's validated flag upon deselection of the applet
+    public void deselect() {
+        m_user_pin.reset();
+    }
 
     private void verifyPin(APDU apdu) {
         byte[] buffer = apdu.getBuffer();

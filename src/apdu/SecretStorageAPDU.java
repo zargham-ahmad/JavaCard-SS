@@ -328,7 +328,7 @@ public class SecretStorageAPDU {
                 pin_type == 1 ? STR_APDU_CHANGE_NORMAL_PIN_HEADER : STR_APDU_CHANGE_DURESS_PIN_HEADER,
                 pin_len/2,
                 pin_len/2,
-                pin_len);
+                pin);
         
         final ResponseAPDU response = cardMngr.transmit(new CommandAPDU(Util.hexStringToByteArray(apdu)));
         
